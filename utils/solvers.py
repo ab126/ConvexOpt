@@ -248,7 +248,7 @@ def ista(gradient_caller, proximal_mapping, n, func_caller, lipschitz_const, xs=
     :param tol: Tolerance condition on norm of gradient for termination
     :param max_iter: Maximum number of iteration before termination
     :param debug: If True, prints  debug information
-    :return: Minimizer point
+    :return: minimizer, function_errors
     """
 
     if x_0 is None:
@@ -291,5 +291,73 @@ def ista(gradient_caller, proximal_mapping, n, func_caller, lipschitz_const, xs=
     return x_k, rel_errors
 
 
+def grad_admm_logreg(grad_caller, prox_mapping, n, func_caller, tau, t, x_0=None, lambda_0=None, tol=None,
+                     max_iter=5_000, debug=False):
+    """
+    Implements gradient-based Alternating Directions Method of Multipliers for the sparse logistic regression
+     problem: min tau*f(x)+g(y) where f has easy proximal mapping and g is differentiable
+
+    :param grad_caller: Function caller returning the gradient of the differentiable portion at the input
+    :param prox_mapping: Function caller for the easy proximal mapping of tau*f(x)
+    :param n: Dimension of the vector space in the respective optimization problem
+    :param func_caller: Caller that evaluates the objective function at a given point
+    :param tau: Constant of f(x)
+    :param t: Step size
+    :param x_0: Initial point
+    :param lambda_0: Initial multiplier
+    :param tol: Tolerance condition on norm primal and dual residual for convergence
+    :param max_iter: Maximum number of iteration before termination
+    :param debug: If True, prints debug information
+    :return: minimizer, function_errors
+    """
+
+    if x_0 is None:
+        x_0 = np.zeros((n, 1))
+
+    if lambda_0 is None:
+        lambda_0 = np.zeros((n, 1))
+
+    if tol is None:
+        tol = 1e-3
+
+    x_k = x_0.copy()
+    y_k = x_0.copy()
+    lambda_k = lambda_0.copy()
+    rel_errors = []
+    f_prev = np.inf
+
+    for i in range(max_iter):
+
+        # Sub-problem x
+        x_k_new = prox_mapping(y_k + lambda_k / t, tau/t)
+
+        # Sub-problem y
+        y_k_new = y_k - t * grad_caller(y_k) - t * lambda_k - (t ** 2) * (y_k - x_k_new)
+
+        # Multiplier
+        lambda_k_new = lambda_k - t * (x_k_new - y_k_new)
+
+        f_new = func_caller( x_k_new )
+
+        rel_error = np.abs((f_new - f_prev) / f_prev)
+        rel_errors.append(rel_error)
+
+        # Convergence via primal and dual residual
+        primal_res = np.linalg.norm(x_k_new - y_k_new)
+        dual_res = np.linalg.norm(y_k_new - y_k)
+        if primal_res < tol and dual_res < tol:
+            return x_k, rel_errors
+
+        # Debug
+        if i % 100 == 0 and debug:
+            print(f"[Grad-ADMM] Iter {i}: rel_error={rel_error:.6g}, t={t:.3e}")
+
+        # Update
+        x_k = x_k_new
+        y_k = y_k_new
+        lambda_k = lambda_k_new
+
+    warnings.warn(f"Maximum number of iterations reached ({max_iter}) in gradient descent")
+    return x_k, rel_errors
 
 
