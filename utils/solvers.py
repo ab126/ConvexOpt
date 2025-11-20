@@ -318,7 +318,7 @@ def grad_admm_logreg(grad_caller, prox_mapping, n, func_caller, tau, t, x_0=None
         lambda_0 = np.zeros((n, 1))
 
     if tol is None:
-        tol = 1e-3
+        tol = 1e-7
 
     x_k = x_0.copy()
     y_k = x_0.copy()
@@ -349,13 +349,14 @@ def grad_admm_logreg(grad_caller, prox_mapping, n, func_caller, tau, t, x_0=None
             return x_k, rel_errors
 
         # Debug
-        if i % 100 == 0 and debug:
-            print(f"[Grad-ADMM] Iter {i}: rel_error={rel_error:.6g}, t={t:.3e}")
+        if i % 10 == 0 and debug:
+            print(f"[Grad-ADMM] Iter {i}: primal_res={primal_res:.6g}, dual_res={dual_res:.6g}, t={t:.3e}")
 
         # Update
         x_k = x_k_new
         y_k = y_k_new
         lambda_k = lambda_k_new
+        f_prev = f_new
 
     warnings.warn(f"Maximum number of iterations reached ({max_iter}) in gradient descent")
     return x_k, rel_errors
